@@ -1,0 +1,9 @@
+{
+  "session_id": "sess_12345",
+  "prompt": "Describe this image in detail",
+  "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "speaking_rate": 1.0,
+  "language": "en",
+  "trace_id": "trace_abc123"
+}
+
