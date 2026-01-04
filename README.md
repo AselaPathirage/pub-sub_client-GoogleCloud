@@ -19,7 +19,7 @@ A Python client for publishing events to Google Cloud Pub/Sub topics.
 
 ### Publish from JSON file:
 ```bash
-python publish_event.py --from-file example_event.json
+python3 publish_event.py --from-file example_event.json
 ```
 
 ## Checking Messages

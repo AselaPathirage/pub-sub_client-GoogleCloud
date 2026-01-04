@@ -1,9 +1,11 @@
 {
-  "session_id": "sess_12345",
-  "prompt": "Describe this image in detail",
-  "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "request_id": "req_1234567890",
+  "session_id": "session_123",
+  "prompt": "who is elon mask",
   "speaking_rate": 1.0,
   "language": "en",
-  "trace_id": "trace_abc123"
+  "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "trace_id": "trace_abc123",
+  "conversation_id": "conv_xyz789"
 }
 

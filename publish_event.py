@@ -27,12 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 def publish_event(
+    request_id: str,
     session_id: str,
     prompt: str,
+    speaking_rate: float = 1.0,
+    language: str = "en",
     image_base64: Optional[str] = None,
-    speaking_rate: Optional[float] = None,
-    language: Optional[str] = None,
     trace_id: Optional[str] = None,
+    conversation_id: Optional[str] = None,
     project_id: Optional[str] = None,
     topic_name: Optional[str] = None,
     credentials_path: Optional[str] = None,
@@ -41,12 +43,14 @@ def publish_event(
     Publish an event to Pub/Sub with the specified structure.
 
     Args:
+        request_id: Unique identifier for the request
         session_id: Unique identifier for the user session
         prompt: Text prompt or instruction
+        speaking_rate: Float for TTS rate tuning (default: 1.0)
+        language: Language code (e.g., 'en', 'es') (default: 'en')
         image_base64: Optional base64-encoded image (if multimodal)
-        speaking_rate: Optional float for TTS rate tuning
-        language: Optional language code (e.g., 'en', 'es')
         trace_id: Optional trace ID for observability
+        conversation_id: Optional conversation ID for context tracking
         project_id: Google Cloud project ID (overrides env var)
         topic_name: Pub/Sub topic name (overrides env var)
         credentials_path: Path to credentials JSON (overrides env var)
@@ -66,19 +70,20 @@ def publish_event(
 
     # Build event payload
     event_data = {
+        "request_id": request_id,
         "session_id": session_id,
         "prompt": prompt,
+        "speaking_rate": speaking_rate,
+        "language": language,
     }
 
     # Add optional fields if provided
     if image_base64 is not None:
         event_data["image_base64"] = image_base64
-    if speaking_rate is not None:
-        event_data["speaking_rate"] = speaking_rate
-    if language is not None:
-        event_data["language"] = language
     if trace_id is not None:
         event_data["trace_id"] = trace_id
+    if conversation_id is not None:
+        event_data["conversation_id"] = conversation_id
 
     # Initialize client and publish
     client = PubSubClient(
@@ -88,12 +93,15 @@ def publish_event(
     )
 
     try:
-        # Add trace_id as an attribute for easier filtering
-        attributes = {}
+        # Add attributes for easier filtering
+        attributes = {
+            "request_id": request_id,
+            "session_id": session_id,
+        }
         if trace_id:
             attributes["trace_id"] = trace_id
-        if session_id:
-            attributes["session_id"] = session_id
+        if conversation_id:
+            attributes["conversation_id"] = conversation_id
 
         message_id = client.publish_json(event_data, attributes=attributes)
         logger.info(f"Successfully published event. Message ID: {message_id}")
@@ -110,22 +118,31 @@ def main():
         epilog="""
 Examples:
   # Publish a simple event
-  python publish_event.py --session-id "sess_123" --prompt "Hello, world!"
+  python publish_event.py \\
+    --request-id "req_123" \\
+    --session-id "sess_123" \\
+    --prompt "Hello, world!"
 
   # Publish with all fields
   python publish_event.py \\
+    --request-id "req_123" \\
     --session-id "sess_123" \\
     --prompt "Describe this image" \\
-    --image-base64 "iVBORw0KGgoAAAANS..." \\
     --speaking-rate 1.2 \\
     --language "en" \\
-    --trace-id "trace_456"
+    --image-base64 "iVBORw0KGgoAAAANS..." \\
+    --trace-id "trace_456" \\
+    --conversation-id "conv_789"
 
   # Publish from JSON file
   python publish_event.py --from-file event.json
         """
     )
 
+    parser.add_argument(
+        "--request-id",
+        help="Unique identifier for the request (required if not using --from-file)"
+    )
     parser.add_argument(
         "--session-id",
         help="Unique identifier for the user session (required if not using --from-file)"
@@ -135,21 +152,27 @@ Examples:
         help="Text prompt or instruction (required if not using --from-file)"
     )
     parser.add_argument(
+        "--speaking-rate",
+        type=float,
+        default=1.0,
+        help="Float for TTS rate tuning (default: 1.0)"
+    )
+    parser.add_argument(
+        "--language",
+        default="en",
+        help="Language code (e.g., 'en', 'es') (default: 'en')"
+    )
+    parser.add_argument(
         "--image-base64",
         help="Optional base64-encoded image (if multimodal)"
     )
     parser.add_argument(
-        "--speaking-rate",
-        type=float,
-        help="Optional float for TTS rate tuning"
-    )
-    parser.add_argument(
-        "--language",
-        help="Optional language code (e.g., 'en', 'es')"
-    )
-    parser.add_argument(
         "--trace-id",
         help="Optional trace ID for observability"
+    )
+    parser.add_argument(
+        "--conversation-id",
+        help="Optional conversation ID for context tracking"
     )
     parser.add_argument(
         "--from-file",
@@ -172,8 +195,8 @@ Examples:
 
     # Validate arguments
     if not args.from_file:
-        if not args.session_id or not args.prompt:
-            parser.error("--session-id and --prompt are required when not using --from-file")
+        if not args.request_id or not args.session_id or not args.prompt:
+            parser.error("--request-id, --session-id, and --prompt are required when not using --from-file")
 
     try:
         # If --from-file is provided, load from file
@@ -182,30 +205,36 @@ Examples:
                 event_data = json.load(f)
             
             # Validate required fields in JSON file
+            if "request_id" not in event_data:
+                raise ValueError("JSON file must contain 'request_id' field")
             if "session_id" not in event_data:
                 raise ValueError("JSON file must contain 'session_id' field")
             if "prompt" not in event_data:
                 raise ValueError("JSON file must contain 'prompt' field")
             
             message_id = publish_event(
+                request_id=event_data.get("request_id"),
                 session_id=event_data.get("session_id"),
                 prompt=event_data.get("prompt"),
+                speaking_rate=event_data.get("speaking_rate", 1.0),
+                language=event_data.get("language", "en"),
                 image_base64=event_data.get("image_base64"),
-                speaking_rate=event_data.get("speaking_rate"),
-                language=event_data.get("language"),
                 trace_id=event_data.get("trace_id"),
+                conversation_id=event_data.get("conversation_id"),
                 project_id=args.project_id,
                 topic_name=args.topic,
                 credentials_path=args.credentials,
             )
         else:
             message_id = publish_event(
+                request_id=args.request_id,
                 session_id=args.session_id,
                 prompt=args.prompt,
-                image_base64=args.image_base64,
                 speaking_rate=args.speaking_rate,
                 language=args.language,
+                image_base64=args.image_base64,
                 trace_id=args.trace_id,
+                conversation_id=args.conversation_id,
                 project_id=args.project_id,
                 topic_name=args.topic,
                 credentials_path=args.credentials,
